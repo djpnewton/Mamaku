@@ -44,8 +44,6 @@ typedef struct _MAMAKU_CONTEXT
 
     WDFQUEUE ChildReportQueue;
 
-    PVOID HidPnpNotificationEntry;
-
     BOOLEAN BthInterfaceRetrieved;
 
     BTH_PROFILE_DRIVER_INTERFACE BthInterface;

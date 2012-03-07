@@ -54,120 +54,6 @@ DriverEntry (
     return status;
 }
 
-NTSTATUS
-MamakuHidPnpNotification(
-    IN PVOID NotificationStructure,
-    IN PVOID Context
-    )
-{
-    PDEVICE_INTERFACE_CHANGE_NOTIFICATION notify = NotificationStructure;
-    PMAMAKU_CONTEXT devContext = Context;
-
-    return STATUS_SUCCESS;
-
-    MamakuPrint(DEBUG_LEVEL_INFO, DBG_PNP,
-        "MamakuHidPnpNotification entry\n");
-
-    if (IsEqualGUID((LPGUID)&(notify->Event), (LPGUID)&GUID_DEVICE_INTERFACE_ARRIVAL))
-    {
-        NTSTATUS                    status;
-        WDFDEVICE                   device;
-        WDF_IO_TARGET_OPEN_PARAMS   openParams;
-        WDFIOTARGET                 ioTarget;
-        WDF_OBJECT_ATTRIBUTES       attributes;
-        WDFMEMORY                   memory;
-        UNICODE_STRING              pdoName;
-        size_t                      bufferLength;
-
-        MamakuPrint(DEBUG_LEVEL_INFO, DBG_PNP,
-             "Arrival of \"%wZ\"\n", notify->SymbolicLinkName);
-
-        //
-        // Get PDO name of new arrival
-        //
-
-        //TODO: get PDO name
-        //
-        // 1. WdfIoTargetOpen / SymbolicLinkName
-        // 2. WdfIoTargetWdmGetTargetPhysicalDevice -> PDEVICE_OBJECT
-        // 3. IoOpenDeviceRegistryKey 
-        //
-        // or
-        //
-        // 1. WdfIoTargetOpen / SymbolicLinkName
-        // 2. WdfIoTargetGetDevice 
-        // 3. WdfDeviceAllocAndQueryProperty / DevicePropertyPhysicalDeviceObjectName
-        //
-
-        status = WdfIoTargetCreate(devContext->Device,
-                            WDF_NO_OBJECT_ATTRIBUTES,
-                            &ioTarget);
-
-        if (!NT_SUCCESS(status)) 
-        {
-            MamakuPrint(DEBUG_LEVEL_ERROR, DBG_PNP,
-                "WdfIoTargetCreate failed with status code 0x%x\n", status);
-
-            return status;
-        }        
-
-        WDF_IO_TARGET_OPEN_PARAMS_INIT_OPEN_BY_NAME(&openParams, notify->SymbolicLinkName, STANDARD_RIGHTS_ALL);
-        openParams.ShareAccess = FILE_SHARE_WRITE | FILE_SHARE_READ;
-
-        status = WdfIoTargetOpen(ioTarget, &openParams);
-
-        if (!NT_SUCCESS(status)) 
-        {
-            MamakuPrint(DEBUG_LEVEL_ERROR, DBG_PNP,
-                "WdfIoTargetOpen failed with status code 0x%x\n", status);
-
-            goto cleanup_ioTarget;
-        }        
-
-        // TODO: shortcut?
-        MamakuPrint(DEBUG_LEVEL_ERROR, DBG_PNP,
-            "My PDO: %p, This PDO: %p\n", WdfDeviceWdmGetPhysicalDevice(devContext->Device), WdfIoTargetWdmGetTargetPhysicalDevice(ioTarget));
-
-        WDF_OBJECT_ATTRIBUTES_INIT(&attributes);
-        attributes.ParentObject = ioTarget;
-        status = WdfIoTargetAllocAndQueryTargetProperty(ioTarget, DevicePropertyPhysicalDeviceObjectName, NonPagedPool, &attributes, &memory);
-
-        if (!NT_SUCCESS(status)) 
-        {
-            MamakuPrint(DEBUG_LEVEL_ERROR, DBG_PNP,
-                "WdfIoTargetAllocAndQueryTargetProperty failed with status code 0x%x\n", status);
-
-            goto cleanup_ioTarget;
-        }       
-
-        pdoName.Buffer = WdfMemoryGetBuffer(memory, &bufferLength);
-
-        if (pdoName.Buffer == NULL)
-        {
-            MamakuPrint(DEBUG_LEVEL_ERROR, DBG_PNP,
-                "WdfMemoryGetBuffer failed 0x%x\n", status); 
-
-            return STATUS_UNSUCCESSFUL;
-        }
-
-        pdoName.MaximumLength = (USHORT) bufferLength;
-        pdoName.Length = (USHORT) bufferLength-sizeof(UNICODE_NULL);
-
-        MamakuPrint(DEBUG_LEVEL_INFO, DBG_PNP,
-             "Arrival of (PDO) \"%wZ\"\n", &pdoName);
-
-cleanup_ioTarget:
-
-        WdfObjectDelete(ioTarget);
-
-        return status;
-    }
-    else
-    {
-        return STATUS_SUCCESS;
-    }
-}
-
 VOID
 MamakuDeviceCleanup(
     IN WDFDEVICE Device
@@ -180,20 +66,6 @@ MamakuDeviceCleanup(
         "MamakuDeviceCleanup entry\n");
 
     devContext = MamakuGetDeviceContext(Device);
-
-    if (devContext->HidPnpNotificationEntry != NULL)
-    {
-        MamakuPrint(DEBUG_LEVEL_INFO, DBG_PNP,
-            "IoUnregisterPlugPlayNotification call\n");
-
-        status = IoUnregisterPlugPlayNotification(devContext->HidPnpNotificationEntry);
-
-        if (!NT_SUCCESS(status)) 
-        {
-            MamakuPrint(DEBUG_LEVEL_ERROR, DBG_PNP,
-                "IoUnregisterPlugPlayNotification failed with status code 0x%x\n", status);
-        }
-    }
 }
 
 NTSTATUS
@@ -213,7 +85,6 @@ MamakuEvtDeviceAdd(
     PDEVICE_OBJECT                childDeviceObjectFdo;
     WDF_IO_TARGET_OPEN_PARAMS     openParams;
     WDFQUEUE                      queue;
-    PDEVICE_OBJECT                deviceObject;
     PMAMAKU_CONTEXT               devContext;
 
     UNREFERENCED_PARAMETER(Driver);
@@ -288,7 +159,6 @@ MamakuEvtDeviceAdd(
     devContext = MamakuGetDeviceContext(device);
     devContext->Device = device;
     devContext->IoTarget = WdfDeviceGetIoTarget(device);
-    devContext->HidPnpNotificationEntry = NULL;
     devContext->BthInterfaceRetrieved = FALSE;
     devContext->BthAddressAndChannelRetrieved = FALSE;
     devContext->InMultitouchMode = FALSE;
@@ -362,22 +232,6 @@ MamakuEvtDeviceAdd(
 
         return status;
     }
-
-    //
-    // Register for Device Interface Change Notification on our (hid) device interface
-    //
-
-    deviceObject = WdfDeviceWdmGetDeviceObject(device);
-
-    status = IoRegisterPlugPlayNotification(EventCategoryDeviceInterfaceChange, PNPNOTIFY_DEVICE_INTERFACE_INCLUDE_EXISTING_INTERFACES, (LPGUID)&GUID_DEVINTERFACE_HID, deviceObject->DriverObject, MamakuHidPnpNotification, devContext, &devContext->HidPnpNotificationEntry);
-
-    if (!NT_SUCCESS(status)) 
-    {
-        MamakuPrint(DEBUG_LEVEL_ERROR, DBG_PNP,
-            "IoRegisterPlugPlayNotification 0x%x\n", status);
-
-        return status;
-    }   
 
     //
     // Create child pdo for multitouch testing
