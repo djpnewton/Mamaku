@@ -1,0 +1,9 @@
+Symbols.pri/
+bin/
+build_logs/
+obj/
+
+*.swp
+*.swo
+*.log
+*~

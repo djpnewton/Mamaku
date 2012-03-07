@@ -1,0 +1,18 @@
+TARGETNAME=katata
+TARGETTYPE=DRIVER
+
+KMDF_VERSION_MAJOR=1
+
+TARGETLIBS=$(DDK_LIB_PATH)\hidclass.lib \
+           $(DDK_LIB_PATH)\ntstrsafe.lib
+
+INCLUDES=..\inc
+
+SOURCES= \
+     katata.c
+
+TARGET_DESTINATION=bin
+
+# Temporarily excuse usage of serviceability impairing macros in code...
+ALLOW_DATE_TIME=1
+
