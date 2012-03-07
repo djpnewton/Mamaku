@@ -139,8 +139,6 @@ CONST HID_DESCRIPTOR DefaultHidDescriptor = {
 
 typedef struct _KATATA_CONTEXT 
 {
-    WDFQUEUE ReportQueue;
-
     WDFIOTARGET IoTarget;
 
     BYTE DeviceMode;

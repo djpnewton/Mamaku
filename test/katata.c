@@ -150,28 +150,6 @@ KatataEvtDeviceAdd(
     }
 
     //
-    // Create manual I/O queue to take care of hid report read requests
-    //
-
-    WDF_IO_QUEUE_CONFIG_INIT(&queueConfig, WdfIoQueueDispatchManual);
-
-    queueConfig.PowerManaged = WdfFalse;
-
-    status = WdfIoQueueCreate(device,
-            &queueConfig,
-            WDF_NO_OBJECT_ATTRIBUTES,
-            &devContext->ReportQueue
-            );
-
-    if (!NT_SUCCESS(status)) 
-    {
-        KatataPrint(DEBUG_LEVEL_ERROR, DBG_PNP,
-            "WdfIoQueueCreate failed 0x%x\n", status);
-
-        return status;
-    }
-
-    //
     // Get I/O target
     //
 
@@ -691,88 +669,6 @@ KatataWriteReport(
 }
 
 NTSTATUS
-KatataProcessVendorReport(
-    IN PKATATA_CONTEXT DevContext,
-    IN PVOID ReportBuffer,
-    IN ULONG ReportBufferLen,
-    OUT size_t* BytesWritten
-    )
-{
-    NTSTATUS status = STATUS_SUCCESS;
-    WDFREQUEST reqRead;
-    PVOID pReadReport = NULL;
-    size_t bytesReturned = 0;
-
-    KatataPrint(DEBUG_LEVEL_VERBOSE, DBG_IOCTL,
-        "KatataProcessVendorReport Entry\n");
-
-    status = WdfIoQueueRetrieveNextRequest(DevContext->ReportQueue, 
-                                           &reqRead);
-
-    if (NT_SUCCESS(status)) 
-    {
-        status = WdfRequestRetrieveOutputBuffer(reqRead,
-                                                ReportBufferLen,
-                                                &pReadReport,
-                                                &bytesReturned);
-
-        if (NT_SUCCESS(status)) 
-        {
-            //
-            // Copy ReportBuffer into read request
-            //
-
-            if (bytesReturned > ReportBufferLen)
-            {
-                bytesReturned = ReportBufferLen;
-            }
-
-            RtlCopyMemory(pReadReport,
-                    ReportBuffer,
-                    bytesReturned);
-
-            //
-            // Complete read with the number of bytes returned as info
-            //
-            
-            WdfRequestCompleteWithInformation(reqRead, 
-                    status, 
-                    bytesReturned);
-
-            KatataPrint(DEBUG_LEVEL_INFO, DBG_IOCTL,
-                    "KatataProcessVendorReport %d bytes returned\n", bytesReturned);
-
-            //
-            // Return the number of bytes written for the write request completion
-            //
-            
-            *BytesWritten = bytesReturned;
-
-            KatataPrint(DEBUG_LEVEL_INFO, DBG_IOCTL,
-                    "%s completed, Queue:0x%p, Request:0x%p\n",
-                    DbgHidInternalIoctlString(IOCTL_HID_READ_REPORT),
-                    DevContext->ReportQueue, 
-                    reqRead);
-        }
-        else
-        {
-            KatataPrint(DEBUG_LEVEL_ERROR, DBG_IOCTL,
-                "WdfRequestRetrieveOutputBuffer failed Status 0x%x\n", status);
-        }
-    }
-    else
-    {
-        KatataPrint(DEBUG_LEVEL_ERROR, DBG_IOCTL,
-                "WdfIoQueueRetrieveNextRequest failed Status 0x%x\n", status);
-    }
-    
-    KatataPrint(DEBUG_LEVEL_VERBOSE, DBG_IOCTL,
-        "KatataProcessVendorReport Exit = 0x%x\n", status);
-
-    return status;
-}
-
-NTSTATUS
 KatataReadReport(
     IN PKATATA_CONTEXT DevContext,
     IN WDFREQUEST Request,
@@ -784,27 +680,6 @@ KatataReadReport(
 
     KatataPrint(DEBUG_LEVEL_VERBOSE, DBG_IOCTL,
         "KatataReadReport Entry\n");
-
-    /*
-    //
-    // Forward this read request to our manual queue
-    // (in other words, we are going to defer this request
-    // until we have a corresponding write request to
-    // match it with)
-    //
-
-    status = WdfRequestForwardToIoQueue(Request, DevContext->ReportQueue);
-
-    if(!NT_SUCCESS(status))
-    {
-        KatataPrint(DEBUG_LEVEL_ERROR, DBG_IOCTL,
-                "WdfRequestForwardToIoQueue failed Status 0x%x\n", status);
-    }
-    else
-    {
-        *CompleteRequest = FALSE;
-    }
-    */
 
     //
     // Forward request to lower driver
