@@ -40,8 +40,6 @@ typedef struct _MAMAKU_CONTEXT
 
     WDFIOTARGET IoTarget;
 
-    WDFIOTARGET ChildIoTarget;
-
     WDFQUEUE ChildReportQueue;
 
     BOOLEAN BthInterfaceRetrieved;

@@ -81,9 +81,6 @@ MamakuEvtDeviceAdd(
     WDF_OBJECT_ATTRIBUTES         attributes;
     WDFDEVICE                     device;
     WDFDEVICE                     childDevice;
-    WDFDEVICE                     childDeviceFdo;
-    PDEVICE_OBJECT                childDeviceObjectFdo;
-    WDF_IO_TARGET_OPEN_PARAMS     openParams;
     WDFQUEUE                      queue;
     PMAMAKU_CONTEXT               devContext;
 
@@ -291,47 +288,6 @@ MamakuEvtDeviceAdd(
     {
         MamakuPrint(DEBUG_LEVEL_ERROR, DBG_PNP,
             "WdfIoQueueCreate #4 failed 0x%x\n", status);
-
-        return status;
-    }
-
-
-
-
-
-    childDeviceFdo = WdfPdoGetParent(childDevice);
-
-    if (childDeviceFdo == NULL)
-    {
-        MamakuPrint(DEBUG_LEVEL_ERROR, DBG_PNP,
-            "WdfPdoGetParent returned NULL\n");
-
-        return STATUS_UNSUCCESSFUL;
-    }
-
-    childDeviceObjectFdo = WdfDeviceWdmGetDeviceObject(childDeviceFdo);
-    WdfDeviceWdmGetDeviceObject(childDevice)->StackSize += childDeviceObjectFdo->StackSize;
-
-    WDF_OBJECT_ATTRIBUTES_INIT(&attributes);
-    attributes.ParentObject = childDeviceFdo;
-    status = WdfIoTargetCreate(childDeviceFdo, &attributes, &devContext->ChildIoTarget);
-
-    if (!NT_SUCCESS (status))
-    {
-        MamakuPrint(DEBUG_LEVEL_ERROR, DBG_PNP,
-            "WdfIoTargetCreate failed 0x%x\n", status);
-
-        return status;
-    }
-
-    WDF_IO_TARGET_OPEN_PARAMS_INIT_EXISTING_DEVICE(&openParams, childDeviceObjectFdo);
-
-    status = WdfIoTargetOpen(devContext->ChildIoTarget, &openParams);
-
-    if (!NT_SUCCESS (status))
-    {
-        MamakuPrint(DEBUG_LEVEL_ERROR, DBG_IOCTL,
-            "WdfIoTargetOpen failed 0x%x\n", status);
 
         return status;
     }
@@ -621,45 +577,6 @@ MamakuSetMultitouchMode(
     //
 
     MamakuCreateWorkItem(devContext, MamakuReadBtWorkItem);
-
-    /*
-    //
-    // TODO: hack put this in its own place
-    //
-
-    {
-        WDF_REQUEST_REUSE_PARAMS  params;
-
-        LARGE_INTEGER li;
-        li.QuadPart = -50000000; // 5 sec delay
-        KeDelayExecutionThread( KernelMode, FALSE, &li );
-
-        MamakuPrint(DEBUG_LEVEL_INFO, DBG_IOCTL,
-            "Sending  IOCTL_KATATA_WRITE\n");
-
-        WDF_REQUEST_REUSE_PARAMS_INIT(&params, WDF_REQUEST_REUSE_NO_FLAGS, STATUS_SUCCESS);
-
-        status = WdfRequestReuse(request, &params);
-
-        if (!NT_SUCCESS (status))
-        {
-            MamakuPrint(DEBUG_LEVEL_ERROR, DBG_IOCTL,
-                "WdfRequestReuse failed 0x%x\n", status);
-
-            goto cleanup;
-        }
-
-        status = WdfIoTargetSendIoctlSynchronously(devContext->ChildIoTarget, request, IOCTL_KATATA_WRITE, NULL, NULL, NULL, NULL);
-
-        if (!NT_SUCCESS (status))
-        {
-            MamakuPrint(DEBUG_LEVEL_ERROR, DBG_IOCTL,
-                "WdfIoTargetSendIoctlSynchronously failed 0x%x\n", status);
-
-            goto cleanup;
-        }
-    }
-    */
 
 cleanup:
 
