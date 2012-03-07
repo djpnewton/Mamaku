@@ -624,7 +624,7 @@ _disectTouch(PMAMAKU_CONTEXT devContext, BYTE* data, int touch_index)
     state = data[8] & 0xf0;
 
     MamakuPrint(DEBUG_LEVEL_BLARG, DBG_IOCTL,
-                "    touch_index: %d, id: %d, x: %d, y: %d\n", touch_index, id, x, y);
+                "    touch_index: %d, id: %d, state: %x, x: %d, y: %d\n", touch_index, id, state, x, y);
 
     {
         NTSTATUS status;
@@ -652,11 +652,18 @@ _disectTouch(PMAMAKU_CONTEXT devContext, BYTE* data, int touch_index)
                     bytesReturned = sizeof(KatataMultiTouchReport);
                 }
 
+#define TP_MIN_X -2909
+#define TP_MAX_X 3167
+#define TP_MIN_Y -2456
+#define TP_MAX_Y 2565
+
                 report->ReportID = REPORTID_MTOUCH;
                 report->Touch[0].Status = MULTI_IN_RANGE_BIT | MULTI_CONFIDENCE_BIT;
+                if (state)
+                    report->Touch[0].Status |= MULTI_TIPSWITCH_BIT;
                 report->Touch[0].ContactID = 0;
-                report->Touch[0].XValue = (USHORT)x;
-                report->Touch[0].YValue = (USHORT)y;
+                report->Touch[0].XValue = (USHORT)(((x - TP_MIN_X) / (float)(TP_MAX_X - TP_MIN_X)) * (float)(MULTI_MAX_COORDINATE - MULTI_MIN_COORDINATE));
+                report->Touch[0].YValue = (USHORT)(((y - TP_MIN_Y) / (float)(TP_MAX_Y - TP_MIN_Y)) * (float)(MULTI_MAX_COORDINATE - MULTI_MIN_COORDINATE));
                 report->Touch[0].Width = 0;
                 report->Touch[0].Height = 0;
                 report->ActualCount = 1;
