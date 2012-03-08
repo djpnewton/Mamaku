@@ -610,7 +610,10 @@ MamakuSetMtWorkItem(
 }
 
 VOID
-_disectTouch(PMAMAKU_CONTEXT devContext, BYTE* data, int touch_index)
+MamakuParseTouch(
+    IN PMAMAKU_CONTEXT devContext,
+    IN BYTE* data,
+    IN int touch_index)
 {
     int x, y, touch_major, touch_minor, size, id, orientation, state;
 
@@ -677,7 +680,7 @@ _disectTouch(PMAMAKU_CONTEXT devContext, BYTE* data, int touch_index)
                         bytesReturned);
 
                 MamakuPrint(DEBUG_LEVEL_INFO, DBG_IOCTL,
-                        "_disectTouch %d bytes returned\n", bytesReturned);
+                        "MamakuParseTouch %d bytes returned\n", bytesReturned);
 
             }
             else
@@ -696,7 +699,10 @@ _disectTouch(PMAMAKU_CONTEXT devContext, BYTE* data, int touch_index)
 }
 
 VOID
-_parseBuffer(PMAMAKU_CONTEXT devContext, BYTE* buf, int size)
+MamakuParseTouchBuffer(
+    IN PMAMAKU_CONTEXT devContext,
+    IN BYTE* buf,
+    IN int size)
 {
     if (*buf == REPORT_ID_TOUCH)
     {
@@ -713,7 +719,7 @@ _parseBuffer(PMAMAKU_CONTEXT devContext, BYTE* buf, int size)
         for (i = 0; i < touch_count; i++)
         {
             data = buf + 4 + i * 9;
-            _disectTouch(devContext, data, i);
+            MamakuParseTouch(devContext, data, i);
         }
     }
     if (*buf == REPORT_ID_TOUCH2)
@@ -721,8 +727,8 @@ _parseBuffer(PMAMAKU_CONTEXT devContext, BYTE* buf, int size)
         MamakuPrint(DEBUG_LEVEL_BLARG, DBG_IOCTL,
             "    Touch Report (2)\n");
 
-        _parseBuffer(devContext, buf + 2, buf[1]);
-        _parseBuffer(devContext, buf + 2 + buf[1], size - 2 - buf[1]);
+        MamakuParseTouchBuffer(devContext, buf + 2, buf[1]);
+        MamakuParseTouchBuffer(devContext, buf + 2 + buf[1], size - 2 - buf[1]);
     }
 }
 
@@ -760,7 +766,7 @@ MamakuReadBtComplete(
 
         if (buf != NULL && aclTransfer->BufferSize > 0 && *buf == REPORT_HEADER)
         {
-            _parseBuffer(devContext, buf + 1, aclTransfer->BufferSize - 1);
+            MamakuParseTouchBuffer(devContext, buf + 1, aclTransfer->BufferSize - 1);
         }
 
         //
