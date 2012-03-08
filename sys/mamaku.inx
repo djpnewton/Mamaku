@@ -10,7 +10,6 @@ CatalogFile=kmdfsamples.cat
 mamaku.sys = 99
 katata.sys = 99
 hidkmdf.sys = 99
-;applewtp_test.sys = 99
 
 [SourceDisksNames]
 99 = %DISK_NAME%,,,""
@@ -47,25 +46,15 @@ Needs = HID_Inst.NT.HW
 [mamaku.Inst.NT.Services]
 Include = hidbth.inf
 Needs	= HIDBTH_Inst.NT.Services
-;AddService = applewtp_test,,AppleWirelessTrackpad_Service_Inst
 AddService = mamaku,,mamaku_Service_Inst
-
-;[AppleWirelessTrackpad_Service_Inst]
-;DisplayName    = %AppleWirelessTrackpad.SvcDesc%                            
-;ServiceType    = %SERVICE_KERNEL_DRIVER% 
-;StartType      = %SERVICE_DEMAND_START% 
-;ErrorControl   = %SERVICE_ERROR_IGNORE% 
-;ServiceBinary  = %12%\applewtp_test.sys     
 
 [CopyDriverFiles]
 hidkmdf.sys
 katata.sys
 mamaku.sys
-;applewtp_test.sys
 
 [mamaku_Parameters.AddReg]
 HKR,,"LowerFilters",0x00010000,"mamaku"
-;HKR,,"LowerFilters",0x00010000,"mamaku applewtp_test"
 
 [mamaku_Service_Inst]
 DisplayName    = %mamaku%
@@ -131,15 +120,11 @@ WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll=99 ; make sure the number matches wit
 [mamaku.Inst.NT.Wdf]
 KmdfService = mamaku, mamaku_wdfsect
 KmdfService = katata, katata_wdfsect
-;KmdfService = applewtp_test, applewtp_test_wdfsect
 
 [mamaku_wdfsect]
 KmdfLibraryVersion = $KMDFVERSION$
 
 [katata_wdfsect]
-KmdfLibraryVersion = $KMDFVERSION$
-
-[applewtp_test_wdfsect]
 KmdfLibraryVersion = $KMDFVERSION$
 
 [Strings] 
@@ -149,7 +134,6 @@ mamaku         = "Magic Trackpad"
 katata         = "Mamaku Test" 
 DISK_NAME      = "mamaku Device Install Disk"
 hidkmdf.SVCDESC= "Filter Driver Service for HID-KMDF Interface layer"
-AppleWirelessTrackpad.DeviceDesc = "Apple Wireless Trackpad"
 
 ;  *******Non Localizable Strings******* 
 
