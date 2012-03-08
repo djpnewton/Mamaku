@@ -613,8 +613,14 @@ VOID
 MamakuParseTouch(
     IN PMAMAKU_CONTEXT devContext,
     IN BYTE* data,
-    IN int touch_index)
+    IN int touch_index,
+    OUT PKatataTouch touch)
 {
+#define TP_MIN_X -2909
+#define TP_MAX_X 3167
+#define TP_MIN_Y -2456
+#define TP_MAX_Y 2565
+
     int x, y, touch_major, touch_minor, size, id, orientation, state;
 
     x = (data[1] << 27 | data[0] << 19) >> 19;
@@ -629,73 +635,77 @@ MamakuParseTouch(
     MamakuPrint(DEBUG_LEVEL_BLARG, DBG_IOCTL,
                 "    touch_index: %d, id: %d, state: %x, x: %d, y: %d\n", touch_index, id, state, x, y);
 
-    {
-        NTSTATUS status;
-        WDFREQUEST reqRead;
-        KatataMultiTouchReport* report;
-        size_t bytesReturned;
+    touch->Status = MULTI_IN_RANGE_BIT | MULTI_CONFIDENCE_BIT;
+    if (state)
+        touch->Status |= MULTI_TIPSWITCH_BIT;
+    touch->ContactID = 0;
+    touch->XValue = (USHORT)(((x - TP_MIN_X) / (float)(TP_MAX_X - TP_MIN_X)) * (float)(MULTI_MAX_COORDINATE - MULTI_MIN_COORDINATE));
+    touch->YValue = (USHORT)(((y - TP_MIN_Y) / (float)(TP_MAX_Y - TP_MIN_Y)) * (float)(MULTI_MAX_COORDINATE - MULTI_MIN_COORDINATE));
+    touch->Width = 0;
+    touch->Height = 0;
 
-        status = WdfIoQueueRetrieveNextRequest(devContext->ChildReportQueue, &reqRead);
+}
+
+NTSTATUS
+MamakuSendTouchReport(
+    IN PMAMAKU_CONTEXT devContext,
+    IN KatataMultiTouchReport* report)
+{
+    NTSTATUS status;
+    WDFREQUEST reqRead;
+    size_t bytesReturned;
+
+    status = WdfIoQueueRetrieveNextRequest(devContext->ChildReportQueue, &reqRead);
+
+    if (NT_SUCCESS(status)) 
+    {
+        PVOID buffer;
+
+        status = WdfRequestRetrieveOutputBuffer(reqRead,
+                                                sizeof(KatataMultiTouchReport),
+                                                &buffer,
+                                                &bytesReturned);
 
         if (NT_SUCCESS(status)) 
         {
-            status = WdfRequestRetrieveOutputBuffer(reqRead,
-                                                    sizeof(KatataMultiTouchReport),
-                                                    &report,
-                                                    &bytesReturned);
+            //
+            // Copy data into request
+            //
 
-            if (NT_SUCCESS(status)) 
+            if (bytesReturned > sizeof(KatataMultiTouchReport))
             {
-                //
-                // Copy data into request
-                //
-
-                if (bytesReturned > sizeof(KatataMultiTouchReport))
-                {
-                    bytesReturned = sizeof(KatataMultiTouchReport);
-                }
-
-#define TP_MIN_X -2909
-#define TP_MAX_X 3167
-#define TP_MIN_Y -2456
-#define TP_MAX_Y 2565
-
-                report->ReportID = REPORTID_MTOUCH;
-                report->Touch[0].Status = MULTI_IN_RANGE_BIT | MULTI_CONFIDENCE_BIT;
-                if (state)
-                    report->Touch[0].Status |= MULTI_TIPSWITCH_BIT;
-                report->Touch[0].ContactID = 0;
-                report->Touch[0].XValue = (USHORT)(((x - TP_MIN_X) / (float)(TP_MAX_X - TP_MIN_X)) * (float)(MULTI_MAX_COORDINATE - MULTI_MIN_COORDINATE));
-                report->Touch[0].YValue = (USHORT)(((y - TP_MIN_Y) / (float)(TP_MAX_Y - TP_MIN_Y)) * (float)(MULTI_MAX_COORDINATE - MULTI_MIN_COORDINATE));
-                report->Touch[0].Width = 0;
-                report->Touch[0].Height = 0;
-                report->ActualCount = 1;
-
-                //
-                // Complete read with the number of bytes returned as info
-                //
-                
-                WdfRequestCompleteWithInformation(reqRead, 
-                        status, 
-                        bytesReturned);
-
-                MamakuPrint(DEBUG_LEVEL_INFO, DBG_IOCTL,
-                        "MamakuParseTouch %d bytes returned\n", bytesReturned);
-
+                bytesReturned = sizeof(KatataMultiTouchReport);
             }
-            else
-            {
-                MamakuPrint(DEBUG_LEVEL_ERROR, DBG_IOCTL,
-                    "WdfRequestRetrieveOutputBuffer failed Status 0x%x\n", status);
-            }
+
+            report->ReportID = REPORTID_MTOUCH;
+
+            RtlCopyMemory(buffer, report, sizeof(KatataMultiTouchReport));
+
+            //
+            // Complete read with the number of bytes returned as info
+            //
+            
+            WdfRequestCompleteWithInformation(reqRead, 
+                    status, 
+                    bytesReturned);
+
+            MamakuPrint(DEBUG_LEVEL_INFO, DBG_IOCTL,
+                    "MamakuParseTouch %d bytes returned\n", bytesReturned);
+
         }
         else
         {
             MamakuPrint(DEBUG_LEVEL_ERROR, DBG_IOCTL,
-                    "WdfIoQueueRetrieveNextRequest failed Status 0x%x\n", status);
+                "WdfRequestRetrieveOutputBuffer failed Status 0x%x\n", status);
         }
-        
     }
+    else
+    {
+        MamakuPrint(DEBUG_LEVEL_ERROR, DBG_IOCTL,
+                "WdfIoQueueRetrieveNextRequest failed Status 0x%x\n", status);
+    }
+
+    return status;
 }
 
 VOID
@@ -704,22 +714,35 @@ MamakuParseTouchBuffer(
     IN BYTE* buf,
     IN int size)
 {
+#define HEADER_SIZE 4
+#define TOUCH_SIZE 9
     if (*buf == REPORT_ID_TOUCH)
     {
         BYTE* data;
-        int i, touch_count = (size - 4) / 9;
+        int i, touch_count = (size - HEADER_SIZE) / TOUCH_SIZE;
         int timestamp;
+        KatataMultiTouchReport report;
 
         MamakuPrint(DEBUG_LEVEL_BLARG, DBG_IOCTL,
             "    Touch Report\n");
 
+        if (size < HEADER_SIZE + touch_count * TOUCH_SIZE)
+        {
+            MamakuPrint(DEBUG_LEVEL_ERROR, DBG_IOCTL,
+                "    buffer too small! #1\n");
+            return;
+        }
+
         data = buf + 1;
         timestamp = data[0] >> 6 | data[1] << 2 | data[2] << 10;
 
+        report.ActualCount = 1;
+
         for (i = 0; i < touch_count; i++)
         {
-            data = buf + 4 + i * 9;
-            MamakuParseTouch(devContext, data, i);
+            data = buf + HEADER_SIZE + i * TOUCH_SIZE;
+            MamakuParseTouch(devContext, data, i, &report.Touch[0]);
+            MamakuSendTouchReport(devContext, &report);
         }
     }
     if (*buf == REPORT_ID_TOUCH2)
@@ -727,7 +750,22 @@ MamakuParseTouchBuffer(
         MamakuPrint(DEBUG_LEVEL_BLARG, DBG_IOCTL,
             "    Touch Report (2)\n");
 
+        if (size < 2 || size < buf[1] + 2)
+        {
+            MamakuPrint(DEBUG_LEVEL_ERROR, DBG_IOCTL,
+                "    buffer too small! #2\n");
+            return;
+        }
+
         MamakuParseTouchBuffer(devContext, buf + 2, buf[1]);
+
+        if (size - 2 - buf[1] < 1)
+        {
+            MamakuPrint(DEBUG_LEVEL_ERROR, DBG_IOCTL,
+                "    buffer too small! #3\n");
+            return;
+        }
+
         MamakuParseTouchBuffer(devContext, buf + 2 + buf[1], size - 2 - buf[1]);
     }
 }

@@ -34,16 +34,16 @@ typedef struct
     USHORT    Height;
 
 }
-TOUCH, *PTOUCH;
+KatataTouch, *PKatataTouch;
 
 typedef struct _VMULTI_MULTITOUCH_REPORT
 {
 
-    BYTE      ReportID;
+    BYTE        ReportID;
 
-    TOUCH     Touch[2];
+    KatataTouch Touch[2];
 
-    BYTE      ActualCount;
+    BYTE        ActualCount;
 
 } KatataMultiTouchReport;
 #pragma pack()
