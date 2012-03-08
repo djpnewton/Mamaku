@@ -638,7 +638,7 @@ MamakuParseTouch(
     touch->Status = MULTI_IN_RANGE_BIT | MULTI_CONFIDENCE_BIT;
     if (state)
         touch->Status |= MULTI_TIPSWITCH_BIT;
-    touch->ContactID = 0;
+    touch->ContactID = (BYTE)id;
     touch->XValue = (USHORT)(((x - TP_MIN_X) / (float)(TP_MAX_X - TP_MIN_X)) * (float)(MULTI_MAX_COORDINATE - MULTI_MIN_COORDINATE));
     touch->YValue = (USHORT)(((y - TP_MIN_Y) / (float)(TP_MAX_Y - TP_MIN_Y)) * (float)(MULTI_MAX_COORDINATE - MULTI_MIN_COORDINATE));
     touch->Width = 0;
@@ -719,9 +719,11 @@ MamakuParseTouchBuffer(
     if (*buf == REPORT_ID_TOUCH)
     {
         BYTE* data;
-        int i, touch_count = (size - HEADER_SIZE) / TOUCH_SIZE;
+        int i;
+        BYTE touch_count = (size - HEADER_SIZE) / TOUCH_SIZE;
         int timestamp;
         KatataMultiTouchReport report;
+        int touches_sent = 0;
 
         MamakuPrint(DEBUG_LEVEL_BLARG, DBG_IOCTL,
             "    Touch Report\n");
@@ -736,13 +738,18 @@ MamakuParseTouchBuffer(
         data = buf + 1;
         timestamp = data[0] >> 6 | data[1] << 2 | data[2] << 10;
 
-        report.ActualCount = 1;
+        report.ActualCount = touch_count;
 
         for (i = 0; i < touch_count; i++)
         {
             data = buf + HEADER_SIZE + i * TOUCH_SIZE;
-            MamakuParseTouch(devContext, data, i, &report.Touch[0]);
-            MamakuSendTouchReport(devContext, &report);
+            MamakuParseTouch(devContext, data, i, &report.Touch[i % 2]);
+            if (i % 2 == 1 || touch_count == 1)
+            {
+                MamakuSendTouchReport(devContext, &report);
+                report.ActualCount = 0;
+                touches_sent += 2;
+            }
         }
     }
     if (*buf == REPORT_ID_TOUCH2)
