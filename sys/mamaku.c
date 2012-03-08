@@ -690,7 +690,7 @@ MamakuSendTouchReport(
                     bytesReturned);
 
             MamakuPrint(DEBUG_LEVEL_INFO, DBG_IOCTL,
-                    "MamakuParseTouch %d bytes returned\n", bytesReturned);
+                    "MamakuSendTouchReport %d bytes returned\n", bytesReturned);
 
         }
         else
@@ -744,7 +744,7 @@ MamakuParseTouchBuffer(
         {
             data = buf + HEADER_SIZE + i * TOUCH_SIZE;
             MamakuParseTouch(devContext, data, i, &report.Touch[i % 2]);
-            if (i % 2 == 1 || touch_count == 1)
+            if (i % 2 == 1 || touch_count - touches_sent == 1)
             {
                 MamakuSendTouchReport(devContext, &report);
                 report.ActualCount = 0;
