@@ -3,6 +3,7 @@
 
 #define REPORTID_MTOUCH            1
 #define REPORTID_FEATURE           2
+#define REPORTID_MOUSE             3
 
 //
 // Multitouch specific report information
@@ -36,7 +37,7 @@ typedef struct
 }
 KatataTouch, *PKatataTouch;
 
-typedef struct _VMULTI_MULTITOUCH_REPORT
+typedef struct _KATATA_MULTITOUCH_REPORT
 {
 
     BYTE        ReportID;
@@ -46,6 +47,37 @@ typedef struct _VMULTI_MULTITOUCH_REPORT
     BYTE        ActualCount;
 
 } KatataMultiTouchReport;
+#pragma pack()
+
+//
+// Relative mouse specific report information
+//
+
+#define MOUSE_BUTTON_1     0x01
+#define MOUSE_BUTTON_2     0x02
+#define MOUSE_BUTTON_3     0x04
+
+#define MOUSE_MIN_COORDINATE   -127
+#define MOUSE_MAX_COORDINATE   127
+
+#define MIN_WHEEL_POS   -127
+#define MAX_WHEEL_POS    127
+
+#pragma pack(1)
+typedef struct _KATATA_RELATIVE_MOUSE_REPORT
+{
+
+    BYTE        ReportID;
+
+    BYTE        Button;
+
+    BYTE        XValue;
+
+    BYTE        YValue;
+
+    BYTE        WheelPosition;
+
+} KatataRelativeMouseReport;
 #pragma pack()
 
 #endif

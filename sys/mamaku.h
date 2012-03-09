@@ -22,6 +22,8 @@
 #include <bthddi.h>
 #include <bthguid.h>
 
+#include "trackpad.h"
+
 //
 // String definitions
 //
@@ -63,6 +65,10 @@ typedef struct _MAMAKU_CONTEXT
     WDFMEMORY ReadMemory;
 
     BOOLEAN InMultitouchMode;
+
+    BOOLEAN UseMultitouchDebug;
+
+    MAMAKU_TRACKPAD Trackpad;
 
 } MAMAKU_CONTEXT, *PMAMAKU_CONTEXT;
 

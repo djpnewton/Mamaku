@@ -159,6 +159,8 @@ MamakuEvtDeviceAdd(
     devContext->BthInterfaceRetrieved = FALSE;
     devContext->BthAddressAndChannelRetrieved = FALSE;
     devContext->InMultitouchMode = FALSE;
+    devContext->UseMultitouchDebug = TRUE;
+    MamakuTrackpadInit(&devContext->Trackpad);
 
     WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&queueConfig, WdfIoQueueDispatchParallel);
 
@@ -639,6 +641,7 @@ MamakuParseTouch(
     if (state)
         touch->Status |= MULTI_TIPSWITCH_BIT;
     touch->ContactID = (BYTE)id;
+    // TODO: remove floating point or save/restore fp context
     touch->XValue = (USHORT)(((x - TP_MIN_X) / (float)(TP_MAX_X - TP_MIN_X)) * (float)(MULTI_MAX_COORDINATE - MULTI_MIN_COORDINATE));
     touch->YValue = (USHORT)(((y - TP_MIN_Y) / (float)(TP_MAX_Y - TP_MIN_Y)) * (float)(MULTI_MAX_COORDINATE - MULTI_MIN_COORDINATE));
     touch->Width = 0;
@@ -649,7 +652,8 @@ MamakuParseTouch(
 NTSTATUS
 MamakuSendTouchReport(
     IN PMAMAKU_CONTEXT devContext,
-    IN KatataMultiTouchReport* report)
+    IN PVOID report,
+    IN size_t reportSize)
 {
     NTSTATUS status;
     WDFREQUEST reqRead;
@@ -662,7 +666,7 @@ MamakuSendTouchReport(
         PVOID buffer;
 
         status = WdfRequestRetrieveOutputBuffer(reqRead,
-                                                sizeof(KatataMultiTouchReport),
+                                                reportSize,
                                                 &buffer,
                                                 &bytesReturned);
 
@@ -672,14 +676,12 @@ MamakuSendTouchReport(
             // Copy data into request
             //
 
-            if (bytesReturned > sizeof(KatataMultiTouchReport))
+            if (bytesReturned > reportSize)
             {
-                bytesReturned = sizeof(KatataMultiTouchReport);
+                bytesReturned = reportSize;
             }
 
-            report->ReportID = REPORTID_MTOUCH;
-
-            RtlCopyMemory(buffer, report, sizeof(KatataMultiTouchReport));
+            RtlCopyMemory(buffer, report, reportSize);
 
             //
             // Complete read with the number of bytes returned as info
@@ -744,11 +746,25 @@ MamakuParseTouchBuffer(
         {
             data = buf + HEADER_SIZE + i * TOUCH_SIZE;
             MamakuParseTouch(devContext, data, i, &report.Touch[i % 2]);
-            if (i % 2 == 1 || touch_count - touches_sent == 1)
+
+            if (devContext->UseMultitouchDebug)
             {
-                MamakuSendTouchReport(devContext, &report);
-                report.ActualCount = 0;
-                touches_sent += 2;
+                if (i % 2 == 1 || touch_count - touches_sent == 1)
+                {
+                    report.ReportID = REPORTID_MTOUCH;
+                    MamakuSendTouchReport(devContext, &report, sizeof(KatataMultiTouchReport));
+                    report.ActualCount = 0;
+                    touches_sent += 2;
+                }
+            }
+            else
+            {
+                KatataRelativeMouseReport mousereport;
+
+                if (MamakuTrackpadProcessTouch(&devContext->Trackpad, &report.Touch[i % 2], &mousereport))
+                {
+                    MamakuSendTouchReport(devContext, &mousereport, sizeof(KatataRelativeMouseReport));
+                }
             }
         }
     }
