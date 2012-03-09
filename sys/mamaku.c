@@ -1,4 +1,5 @@
 #include "mamaku.h"
+#include "mamaku_common.h"
 #include "../inc/katata_common.h"
 
 //
@@ -159,7 +160,7 @@ MamakuEvtDeviceAdd(
     devContext->BthInterfaceRetrieved = FALSE;
     devContext->BthAddressAndChannelRetrieved = FALSE;
     devContext->InMultitouchMode = FALSE;
-    devContext->UseMultitouchDebug = TRUE;
+    devContext->UseMultitouchDebug = FALSE;
     MamakuTrackpadInit(&devContext->Trackpad);
 
     WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&queueConfig, WdfIoQueueDispatchParallel);
@@ -616,6 +617,25 @@ MamakuParseTouch(
     IN PMAMAKU_CONTEXT devContext,
     IN BYTE* data,
     IN int touch_index,
+    OUT PMamakuTrackpadData tp_data)
+{
+    tp_data->x = (data[1] << 27 | data[0] << 19) >> 19;
+    tp_data->y = -((data[3] << 30 | data[2] << 22 | data[1] << 14) >> 19);
+    tp_data->major = data[4];
+    tp_data->minor = data[5];
+    tp_data->size = data[6] & 0x3f;
+    tp_data->id = (data[7] << 2 | data[6] >> 6) & 0xf;
+    tp_data->orientation = (data[7] >> 2) - 32;
+    tp_data->state = data[8] & 0xf0;
+
+    MamakuPrint(DEBUG_LEVEL_BLARG, DBG_IOCTL,
+                "    touch_index: %d, id: %d, state: %x, x: %d, y: %d\n", touch_index, tp_data->id, tp_data->state, tp_data->x, tp_data->y);
+
+}
+
+VOID MamakuInitKatataTouch(
+    IN PMAMAKU_CONTEXT devContext,
+    IN PMamakuTrackpadData tp_data,
     OUT PKatataTouch touch)
 {
 #define TP_MIN_X -2909
@@ -623,30 +643,15 @@ MamakuParseTouch(
 #define TP_MIN_Y -2456
 #define TP_MAX_Y 2565
 
-    int x, y, touch_major, touch_minor, size, id, orientation, state;
-
-    x = (data[1] << 27 | data[0] << 19) >> 19;
-    y = -((data[3] << 30 | data[2] << 22 | data[1] << 14) >> 19);
-    touch_major = data[4];
-    touch_minor = data[5];
-    size = data[6] & 0x3f;
-    id = (data[7] << 2 | data[6] >> 6) & 0xf;
-    orientation = (data[7] >> 2) - 32;
-    state = data[8] & 0xf0;
-
-    MamakuPrint(DEBUG_LEVEL_BLARG, DBG_IOCTL,
-                "    touch_index: %d, id: %d, state: %x, x: %d, y: %d\n", touch_index, id, state, x, y);
-
     touch->Status = MULTI_IN_RANGE_BIT | MULTI_CONFIDENCE_BIT;
-    if (state)
+    if (tp_data->state)
         touch->Status |= MULTI_TIPSWITCH_BIT;
-    touch->ContactID = (BYTE)id;
+    touch->ContactID = (BYTE)tp_data->id;
     // TODO: remove floating point or save/restore fp context
-    touch->XValue = (USHORT)(((x - TP_MIN_X) / (float)(TP_MAX_X - TP_MIN_X)) * (float)(MULTI_MAX_COORDINATE - MULTI_MIN_COORDINATE));
-    touch->YValue = (USHORT)(((y - TP_MIN_Y) / (float)(TP_MAX_Y - TP_MIN_Y)) * (float)(MULTI_MAX_COORDINATE - MULTI_MIN_COORDINATE));
+    touch->XValue = (USHORT)(((tp_data->x - TP_MIN_X) / (float)(TP_MAX_X - TP_MIN_X)) * (float)(MULTI_MAX_COORDINATE - MULTI_MIN_COORDINATE));
+    touch->YValue = (USHORT)(((tp_data->y - TP_MIN_Y) / (float)(TP_MAX_Y - TP_MIN_Y)) * (float)(MULTI_MAX_COORDINATE - MULTI_MIN_COORDINATE));
     touch->Width = 0;
     touch->Height = 0;
-
 }
 
 NTSTATUS
@@ -724,7 +729,8 @@ MamakuParseTouchBuffer(
         int i;
         BYTE touch_count = (size - HEADER_SIZE) / TOUCH_SIZE;
         int timestamp;
-        KatataMultiTouchReport report;
+        MamakuTrackpadData tp_data;
+        KatataMultiTouchReport multireport;
         int touches_sent = 0;
 
         MamakuPrint(DEBUG_LEVEL_BLARG, DBG_IOCTL,
@@ -740,20 +746,22 @@ MamakuParseTouchBuffer(
         data = buf + 1;
         timestamp = data[0] >> 6 | data[1] << 2 | data[2] << 10;
 
-        report.ActualCount = touch_count;
+        multireport.ActualCount = touch_count;
 
         for (i = 0; i < touch_count; i++)
         {
             data = buf + HEADER_SIZE + i * TOUCH_SIZE;
-            MamakuParseTouch(devContext, data, i, &report.Touch[i % 2]);
+
+            MamakuParseTouch(devContext, data, i, &tp_data);
 
             if (devContext->UseMultitouchDebug)
             {
+                MamakuInitKatataTouch(devContext, &tp_data, &multireport.Touch[i % 2]);
                 if (i % 2 == 1 || touch_count - touches_sent == 1)
                 {
-                    report.ReportID = REPORTID_MTOUCH;
-                    MamakuSendTouchReport(devContext, &report, sizeof(KatataMultiTouchReport));
-                    report.ActualCount = 0;
+                    multireport.ReportID = REPORTID_MTOUCH;
+                    MamakuSendTouchReport(devContext, &multireport, sizeof(KatataMultiTouchReport));
+                    multireport.ActualCount = 0;
                     touches_sent += 2;
                 }
             }
@@ -761,8 +769,10 @@ MamakuParseTouchBuffer(
             {
                 KatataRelativeMouseReport mousereport;
 
-                if (MamakuTrackpadProcessTouch(&devContext->Trackpad, &report.Touch[i % 2], &mousereport))
+                if (MamakuTrackpadProcessTouch(&devContext->Trackpad, &tp_data, &mousereport))
                 {
+                    MamakuPrint(DEBUG_LEVEL_ERROR, DBG_IOCTL,
+                        "    mouse report dx: %d, dy: %d\n", mousereport.XValue, mousereport.YValue);
                     MamakuSendTouchReport(devContext, &mousereport, sizeof(KatataRelativeMouseReport));
                 }
             }

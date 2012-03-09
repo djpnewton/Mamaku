@@ -4,15 +4,16 @@
 #include <wdm.h>
 #include <wdf.h>
 
+#include "mamaku_common.h"
 #include "../inc/katata_common.h"
 
 typedef struct
 {
     BYTE    State;
 
-    USHORT  X;
+    int     X;
 
-    USHORT  Y;
+    int     Y;
 
 } MAMAKU_TRACKPAD, *PMAMAKU_TRACKPAD;
 
@@ -23,6 +24,6 @@ typedef struct
 
 VOID MamakuTrackpadInit(IN PMAMAKU_TRACKPAD tp);
 
-BOOLEAN MamakuTrackpadProcessTouch(IN PMAMAKU_TRACKPAD tp, IN KatataTouch* touch, OUT KatataRelativeMouseReport* report);
+BOOLEAN MamakuTrackpadProcessTouch(IN PMAMAKU_TRACKPAD tp, IN PMamakuTrackpadData tp_data, OUT KatataRelativeMouseReport* report);
 
 #endif

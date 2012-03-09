@@ -12,23 +12,23 @@ MamakuTrackpadInit(
 BOOLEAN
 MamakuTrackpadProcessTouch(
     IN PMAMAKU_TRACKPAD tp,
-    IN KatataTouch* touch,
+    IN PMamakuTrackpadData tp_data,
     OUT KatataRelativeMouseReport* report
     )
 {
     switch (tp->State)
     {
         case MAMAKU_TP_IDLE:
-            if ((touch->Status & MULTI_TIPSWITCH_BIT) == MULTI_TIPSWITCH_BIT)
+            if (tp_data->state)
             {
                 tp->State = MAMAKU_TP_TOUCHDOWN;
-                tp->X = touch->XValue;
-                tp->Y = touch->YValue;
+                tp->X = tp_data->x;
+                tp->Y = tp_data->y;
             }
             break;
 
         case MAMAKU_TP_TOUCHDOWN:
-            if ((touch->Status & MULTI_TIPSWITCH_BIT) == MULTI_TIPSWITCH_BIT)
+            if (tp_data->state)
             {
                 tp->State = MAMAKU_TP_DRAG;
 
@@ -41,12 +41,12 @@ MamakuTrackpadProcessTouch(
             }
 
         case MAMAKU_TP_DRAG:
-            if ((touch->Status & MULTI_TIPSWITCH_BIT) == MULTI_TIPSWITCH_BIT)
+            if (tp_data->state)
             {
-                char dx = touch->XValue - tp->X;
-                char dy = touch->YValue - tp->Y;
-                tp->X = touch->XValue;
-                tp->Y = touch->YValue;
+                char dx = (tp_data->x - tp->X);
+                char dy = (tp_data->y - tp->Y);
+                tp->X = tp_data->x;
+                tp->Y = tp_data->y;
 
                 report->ReportID = REPORTID_MOUSE;
                 report->Button = 0; //TODO: for now
