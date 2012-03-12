@@ -3,6 +3,7 @@
 #include <Hidport.h>
 
 #include "mamaku.h"
+#include "trace.h"
 
 #define BUS_HARDWARE_IDS L"DJPSOFT\\MamakuTest\0"
 #define BUS_HARDWARE_IDS_LENGTH sizeof(BUS_HARDWARE_IDS)
@@ -12,9 +13,6 @@
 #define BUS_DEVICE_INSTANCEID L"0x7337"
 #define BUS_DEVICE_TEXT L"MamakuTest "BUS_DEVICE_INSTANCEID
 #define BUS_DEVICE_SERIALNUM 1
-
-extern ULONG MamakuDebugLevel;
-extern ULONG MamakuDebugCatagories;
 
 NTSTATUS
 MamakuCreatePdo(

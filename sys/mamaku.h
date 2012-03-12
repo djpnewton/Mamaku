@@ -28,8 +28,6 @@
 // String definitions
 //
 
-#define DRIVERNAME                 "mamaku.sys: "
-
 #define MAMAKU_POOL_TAG            (ULONG) 'amam'
 
 #define NTDEVICE_NAME_STRING       L"\\Device\\Mamaku"
@@ -65,8 +63,6 @@ typedef struct _MAMAKU_CONTEXT
     WDFMEMORY ReadMemory;
 
     BOOLEAN InMultitouchMode;
-
-    BOOLEAN UseMultitouchDebug;
 
     MAMAKU_TRACKPAD Trackpad;
 
@@ -112,32 +108,5 @@ VOID MamakuCreateWorkItem(IN PMAMAKU_CONTEXT devContext, IN PFN_WDF_WORKITEM wor
 EVT_WDF_IO_QUEUE_IO_INTERNAL_DEVICE_CONTROL MamakuIoInternalDeviceControl;
 
 EVT_WDF_IO_QUEUE_IO_INTERNAL_DEVICE_CONTROL MamakuChildPdoIoInternalDeviceControl;
-
-//
-// Helper macros
-//
-
-#define DEBUG_LEVEL_ERROR   1
-#define DEBUG_LEVEL_BLARG   2
-#define DEBUG_LEVEL_INFO    3
-#define DEBUG_LEVEL_VERBOSE 4
-
-#define DBG_INIT  1
-#define DBG_PNP   2
-#define DBG_IOCTL 4
-
-#if DBG
-#define MamakuPrint(dbglevel, dbgcatagory, fmt, ...) {          \
-    if (MamakuDebugLevel >= dbglevel &&                         \
-        (MamakuDebugCatagories && dbgcatagory))                 \
-    {                                                           \
-        DbgPrint(DRIVERNAME);                                   \
-        DbgPrint(fmt, __VA_ARGS__);                             \
-    }                                                           \
-}
-#else
-#define MamakuPrint(dbglevel, fmt, ...) {                       \
-}
-#endif
 
 #endif

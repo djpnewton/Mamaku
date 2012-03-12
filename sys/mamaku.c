@@ -1,13 +1,8 @@
 #include "mamaku.h"
 #include "mamaku_common.h"
+#include "registry.h"
 #include "../inc/katata_common.h"
-
-//
-// Globals
-//
-
-ULONG MamakuDebugLevel      = 100;//DEBUG_LEVEL_BLARG;
-ULONG MamakuDebugCatagories = DBG_INIT || DBG_PNP || DBG_IOCTL;
+#include "trace.h"
 
 //
 // Protocol defines
@@ -160,7 +155,6 @@ MamakuEvtDeviceAdd(
     devContext->BthInterfaceRetrieved = FALSE;
     devContext->BthAddressAndChannelRetrieved = FALSE;
     devContext->InMultitouchMode = FALSE;
-    devContext->UseMultitouchDebug = FALSE;
     MamakuTrackpadInit(&devContext->Trackpad);
 
     WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&queueConfig, WdfIoQueueDispatchParallel);
@@ -754,7 +748,7 @@ MamakuParseTouchBuffer(
 
             MamakuParseTouch(devContext, data, i, &tp_data);
 
-            if (devContext->UseMultitouchDebug)
+            if (MamakuRegistryGetUseMultitouch())
             {
                 MamakuInitKatataTouch(devContext, &tp_data, &multireport.Touch[i % 2]);
                 if (i % 2 == 1 || touch_count - touches_sent == 1)

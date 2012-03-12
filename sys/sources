@@ -12,7 +12,8 @@ SOURCES= \
      mamaku.c  \
      mamaku.rc \
      buspdo.c \
-     trackpad.c
+     trackpad.c \
+     registry.c
 
 INF_NAME=mamaku
 NTTARGETFILE0=$(OBJ_PATH)\$(O)\$(INF_NAME).inf
