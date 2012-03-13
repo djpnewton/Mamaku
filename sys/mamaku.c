@@ -22,6 +22,7 @@ DriverEntry (
     NTSTATUS               status = STATUS_SUCCESS;
     WDF_DRIVER_CONFIG      config;
     WDF_OBJECT_ATTRIBUTES  attributes;
+    WDFDRIVER              driver;
 
     MamakuPrint(DEBUG_LEVEL_INFO, DBG_INIT,
         "Driver Entry: Built %s %s\n", __DATE__, __TIME__);
@@ -38,14 +39,22 @@ DriverEntry (
                              RegistryPath,
                              &attributes,      
                              &config,         
-                             WDF_NO_HANDLE
+                             &driver
                              );
 
     if (!NT_SUCCESS(status)) 
     {
         MamakuPrint(DEBUG_LEVEL_ERROR, DBG_INIT,
             "WdfDriverCreate failed with status 0x%x\n", status);
+
+        return status;
     }
+
+    //
+    // Initialize settings from registry
+    //
+
+    MamakuRegistryInit(driver);
 
     return status;
 }
