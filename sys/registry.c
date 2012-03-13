@@ -25,11 +25,10 @@ VOID MamakuRegistryInit(IN WDFDRIVER Driver)
     {
         MamakuPrint(DEBUG_LEVEL_ERROR, DBG_INIT,
             "WdfRegistryQueryULong failed with status 0x%x\n", status);
-
-        goto cleanup;
     }
 
-cleanup:
+    MamakuPrint(DEBUG_LEVEL_ERROR, DBG_INIT,
+        "UseMultitouchDebug = %d\n", UseMultitouch);
 
     WdfRegistryClose(key);
 }
