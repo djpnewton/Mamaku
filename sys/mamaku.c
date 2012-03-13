@@ -103,6 +103,8 @@ MamakuEvtDeviceAdd(
 
     pnpPowerCallbacks.EvtDeviceD0Entry = MamakuD0Entry; 
     pnpPowerCallbacks.EvtDeviceD0Exit = MamakuD0Exit; 
+    pnpPowerCallbacks.EvtDeviceQueryRemove = MamakuQueryRemove;
+    pnpPowerCallbacks.EvtDeviceQueryStop = MamakuQueryStop;
 
     WdfDeviceInitSetPnpPowerEventCallbacks(DeviceInit, &pnpPowerCallbacks);
 
@@ -304,22 +306,56 @@ MamakuD0Entry(
     return STATUS_SUCCESS;
 }
 
+VOID
+MamakuStopMulitouchAndCleanupQueue(
+    IN WDFDEVICE Device
+    )
+{
+    PMAMAKU_CONTEXT devContext;
+
+    devContext = MamakuGetDeviceContext(Device);
+
+    devContext->InMultitouchMode = FALSE;
+
+    WdfIoQueuePurge(devContext->DeadAclTransferQueue, NULL, NULL);
+}
+
 NTSTATUS
 MamakuD0Exit(
     IN WDFDEVICE Device,
     IN WDF_POWER_DEVICE_STATE TargetState
     )
 {
-    PMAMAKU_CONTEXT devContext;
-
     MamakuPrint(DEBUG_LEVEL_INFO, DBG_PNP,
         "MamakuD0Exit called\n");
 
-    devContext = MamakuGetDeviceContext(Device);
-    
-    devContext->InMultitouchMode = FALSE;
+    MamakuStopMulitouchAndCleanupQueue(Device);
 
-    WdfIoQueuePurge(devContext->DeadAclTransferQueue, NULL, NULL);
+    return STATUS_SUCCESS;
+}
+
+NTSTATUS
+MamakuQueryRemove(
+    IN WDFDEVICE Device
+    )
+{
+    MamakuPrint(DEBUG_LEVEL_INFO, DBG_PNP,
+        "MamakuQueryRemove called\n");
+
+    MamakuStopMulitouchAndCleanupQueue(Device);
+
+    return STATUS_SUCCESS;
+}
+
+NTSTATUS
+MamakuQueryStop(
+    IN WDFDEVICE Device
+    )
+{
+    MamakuPrint(DEBUG_LEVEL_INFO, DBG_PNP,
+        "MamakuQueryStop called\n");
+
+    MamakuStopMulitouchAndCleanupQueue(Device);
 
     return STATUS_SUCCESS;
 }
