@@ -8,4 +8,6 @@ VOID MamakuRegistryInit(IN WDFDRIVER Driver);
 
 BOOLEAN MamakuRegistryGetUseMultitouch(void);
 
+ULONG MamakuRegistryGetDragThreshold(void);
+
 #endif

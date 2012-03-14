@@ -1,13 +1,15 @@
 #include "registry.h"
 #include "trace.h"
 
-static ULONG UseMultitouch;
+static ULONG UseMultitouch = 0;
+static ULONG DragThreshold = 20;
 
 VOID MamakuRegistryInit(IN WDFDRIVER Driver)
 {
     NTSTATUS status;
     WDFKEY key;
     DECLARE_CONST_UNICODE_STRING(UseMultitouchName, L"UseMultitouchDebug");
+    DECLARE_CONST_UNICODE_STRING(DragThresholdName, L"DragThreshold");
 
     status = WdfDriverOpenParametersRegistryKey(Driver, STANDARD_RIGHTS_ALL, WDF_NO_OBJECT_ATTRIBUTES, &key);
 
@@ -24,11 +26,22 @@ VOID MamakuRegistryInit(IN WDFDRIVER Driver)
     if (!NT_SUCCESS(status)) 
     {
         MamakuPrint(DEBUG_LEVEL_ERROR, DBG_INIT,
-            "WdfRegistryQueryULong failed with status 0x%x\n", status);
+            "WdfRegistryQueryULong(UseMultitouch) failed with status 0x%x\n", status);
     }
 
     MamakuPrint(DEBUG_LEVEL_ERROR, DBG_INIT,
         "UseMultitouchDebug = %d\n", UseMultitouch);
+
+    status = WdfRegistryQueryULong(key, &DragThresholdName, &DragThreshold);
+
+    if (!NT_SUCCESS(status)) 
+    {
+        MamakuPrint(DEBUG_LEVEL_ERROR, DBG_INIT,
+            "WdfRegistryQueryULong(DragThreshold) failed with status 0x%x\n", status);
+    }
+
+    MamakuPrint(DEBUG_LEVEL_ERROR, DBG_INIT,
+        "DragThreshold = %d\n", DragThreshold);
 
     WdfRegistryClose(key);
 }
@@ -36,4 +49,9 @@ VOID MamakuRegistryInit(IN WDFDRIVER Driver)
 BOOLEAN MamakuRegistryGetUseMultitouch(void)
 {
     return (BOOLEAN)UseMultitouch;
+}
+
+ULONG MamakuRegistryGetDragThreshold(void)
+{
+    return DragThreshold;
 }

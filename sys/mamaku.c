@@ -166,7 +166,7 @@ MamakuEvtDeviceAdd(
     devContext->BthInterfaceRetrieved = FALSE;
     devContext->BthAddressAndChannelRetrieved = FALSE;
     devContext->InMultitouchMode = FALSE;
-    MamakuTrackpadInit(&devContext->Trackpad);
+    MamakuTrackpadInit(&devContext->Trackpad, MamakuRegistryGetDragThreshold());
 
     WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&queueConfig, WdfIoQueueDispatchParallel);
 
@@ -668,7 +668,7 @@ MamakuParseTouch(
     tp_data->state = data[8] & 0xf0;
 
     MamakuPrint(DEBUG_LEVEL_BLARG, DBG_IOCTL,
-                "    touch_index: %d, id: %d, state: %x, x: %d, y: %d\n", touch_index, tp_data->id, tp_data->state, tp_data->x, tp_data->y);
+                "    touch_index: %d, id: %d, state: 0x%x, x: %d, y: %d\n", touch_index, tp_data->id, tp_data->state, tp_data->x, tp_data->y);
 
 }
 
